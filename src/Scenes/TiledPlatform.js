@@ -8,6 +8,8 @@ class TiledPlatform extends Phaser.Scene {
         this.MAX_Y_VEL = 2000;
         this.DRAG = 600;    
         this.JUMP_VELOCITY = -650;
+
+
     }
 
     preload() {
@@ -18,9 +20,21 @@ class TiledPlatform extends Phaser.Scene {
             frameHeight: 16
         });
         this.load.tilemapTiledJSON("platform_map", "tilemap02.json");    // Tiled JSON file
+       // this.load.tilemapTiledJSON("animatedmap", "tilemap07.json");    // Tiled JSON file
     }
 
     create() {
+
+        // create tile animation timer
+        // this fires the tileAnimate routine at each tick of the global animation clock
+        this.tileAnimationTimer = this.time.addEvent({
+            delay: this.animationFreq,
+            callback: this.tileAnimate,
+            callbackScope: this,
+            loop: true
+        });
+
+
         // add a tilemap
         const map = this.add.tilemap("platform_map");
         // add a tileset to the map
@@ -107,16 +121,53 @@ class TiledPlatform extends Phaser.Scene {
         });
         // then add the coins to a group
         this.coinGroup = this.add.group(this.coins);
+        this.bluePowerUps = map.createFromObjects("Objects", {
+            name: "bluePowerUp",
+            key: "kenney_sheet",
+            frame: 513
+        });
+        this.physics.world.enable(this.bluePowerUps, Phaser.Physics.Arcade.STATIC_BODY);
+        this.bluePowerUpGroup = this.add.group(this.bluePowerUps);
+
 
         // set gravity and physics world bounds (so collideWorldBounds works)
         this.physics.world.gravity.y = 2000;
         this.physics.world.bounds.setTo(0, 0, map.widthInPixels, map.heightInPixels);
 
+        // create coin effect
+        this.coinVfxManager = this.add.particles('kenney_sheet', 214);
+        this.coinVfxEffect = this.coinVfxManager.createEmitter({
+            follow: this.p1,
+            quantity: 10,
+            scale: {start: 0.5, end: 0.0},  // start big, end small
+            speed: {min: 50, max: 100}, // speed up
+            lifespan: 800,   // short lifespan
+            on: false   // do not immediately start, will trigger in collision
+        });
+
         // create collider(s)/overlap(s)
         this.physics.add.collider(this.p1, groundLayer);
         this.physics.add.overlap(this.p1, this.coinGroup, (obj1, obj2) => {
+            this.coinVfxEffect.explode();  // trigger particle system
             obj2.destroy(); // remove coin on overlap
         });
+
+
+        this.powerUpVfxManager = this.add.particles('kenney_sheet', 215);
+
+
+        this.powerUpVfxEffect = this.powerUpVfxManager.createEmitter({
+            follow: this.p1,
+            quantity: 20,
+            scale: {start: 1.0, end: 0.0},  // start big, end small
+            speed: {min: 50, max: 100}, // speed up
+            lifespan: 800,   // short lifespan
+            on: false   // do not immediately start, will trigger in collision
+        });
+        this.physics.add.overlap(this.p1, this.bluePowerUpGroup, (obj1, obj2) => {
+            this.powerUpVfxEffect.explode();  // trigger particle system
+            obj2.destroy(); // remove power up
+        })
 
         // setup camera
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
@@ -136,6 +187,7 @@ class TiledPlatform extends Phaser.Scene {
         // debug
         //this.scene.start("");
     }
+
 
     update() {
         // player movement
